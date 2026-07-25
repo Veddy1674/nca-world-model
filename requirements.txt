@@ -1,0 +1,10 @@
+Pillow
+opencv-python
+matplotlib
+pydantic
+tqdm
+equinox
+numpy
+optax
+optuna
+seaborn
