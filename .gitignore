@@ -1,0 +1,33 @@
+# exclude everything
+*
+
+# whitelist of known files
+!NACE.py
+!train.py
+!inference.py
+!inference_cv2.py
+!dataload.py
+!benchmark.py
+!base_config.py
+!sweep.py
+!requirements.txt
+!.gitignore
+
+# whitelist folders TODO only include example etc, exclude .npz etc...
+!example/
+!example/**/*
+!mario/
+!mario/**/*
+!mario2/
+!mario2/**/*
+!mario3/
+!mario3/**/*
+!finish/
+!finish/**/*
+!snake/
+!snake/**/*
+!sm64test/
+!sm64test/**/*
+
+# TODO (temp) just to exclude the many contents
+sm64test/data/
