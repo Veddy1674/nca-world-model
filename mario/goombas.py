@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 import numpy as np
 import cv2
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 15000
@@ -42,7 +42,7 @@ COLOR_MAP = [
 _class_weights = jnp.array([0.1, 1.0])
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),
@@ -132,7 +132,7 @@ def get_offset_from_circular(sin_cos):
     return int(round((angle / (2 * np.pi)) * MAGIC)) % MAGIC
 
 # custom inference logic:
-def state_convert(model: NACE, state: jax.Array, hid: jax.Array):
+def state_convert(model: NCA_WM, state: jax.Array, hid: jax.Array):
     # move to RAM
     visible = np.array(state, dtype=np.uint8)
     hidden = np.array(hid, dtype=np.float32)

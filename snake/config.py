@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import optax
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 8000
@@ -47,7 +47,7 @@ _kernel = [
 ]
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),

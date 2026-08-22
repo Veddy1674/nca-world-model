@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import optax
 import optuna
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # Note that for showcases purposes, this model is underparameterized and
 # undertrained to grant fair performance in little training time
@@ -40,8 +40,8 @@ SUBSTEPS = 16
 
 COLOR_MAP = None
 
-def make_model(key: jax.Array) -> NACE:
-    return NACE(
+def make_model(key: jax.Array) -> NCA_WM:
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels="RGB",#len(COLOR_MAP),
@@ -63,7 +63,7 @@ def loss_calc(vis_preds: jnp.ndarray, hid_preds: None, targets: jnp.ndarray, act
     return jnp.mean((vis_preds - targets) ** 2)
 
 # example way of using this function, to test what learning rate is the best to use
-def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NACE, optax.GradientTransformation]:
+def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NCA_WM, optax.GradientTransformation]:
     lrinit = trial.suggest_float("lr_init_value", 9e-2, 5e-1)
 
     return make_model(key), optax.chain(

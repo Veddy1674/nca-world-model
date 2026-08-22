@@ -5,14 +5,14 @@ import optuna
 from pydantic import BaseModel, Field
 from typing import Callable, Literal, Any
 from cv2.typing import MatLike
-from NACE import NACE
+from NCA_WM import NCA_WM
 import numpy as np
 import importlib.util
 import os
 import sys
 
 # all the constants and functions required in a configuration
-class NACEConfig(BaseModel):
+class NCA_WM_Config(BaseModel):
     # training parameters
     STEPS: int = Field(gt=0)
     BATCH_SIZE: int = Field(gt=0)
@@ -44,16 +44,16 @@ class NACEConfig(BaseModel):
     make_optimizer: Callable[[], tuple[optax.GradientTransformation, optax.Schedule]]
     init_hidden: Callable[[jax.Array, jax.Array | None, int, int, int], jax.Array] | None = None # initialize hidden channels each train sequence to certain values (by default zeroed)
     loss_calc: Callable[[jax.Array, jax.Array | None, jax.Array, jax.Array | None, jax.Array | None], jax.Array]
-    add_noise: Callable[[NACE, jax.Array, jax.Array, Any], jax.Array] | None = None
+    add_noise: Callable[[NCA_WM, jax.Array, jax.Array, Any], jax.Array] | None = None
 
-    hyperparam_sweep: Callable[[jax.Array, optuna.Trial], tuple[NACE, optax.GradientTransformation]] | None = None
+    hyperparam_sweep: Callable[[jax.Array, optuna.Trial], tuple[NCA_WM, optax.GradientTransformation]] | None = None
 
-    state_convert: Callable[[NACE, jax.Array, jax.Array | None], MatLike] | None = None # optional function to convert model prediction to cv2 render format with a custom logic
+    state_convert: Callable[[NCA_WM, jax.Array, jax.Array | None], MatLike] | None = None # optional function to convert model prediction to cv2 render format with a custom logic
 
     model_config = {"arbitrary_types_allowed": True}
 
 # called from scripts that require a configuration file
-def load_configuration() -> NACEConfig:
+def load_configuration() -> NCA_WM_Config:
     # arg0 is configPath, if null ask via input()
     if len(sys.argv) < 2:
         try:
@@ -85,7 +85,7 @@ def load_configuration() -> NACEConfig:
     
     try:
         # just to validate, unused
-        valid_config = NACEConfig(**config_vars)
+        valid_config = NCA_WM_Config(**config_vars)
     except Exception as e:
         print(f"Validation of config {config_path} failed: {str(e)}")
         sys.exit(1)
@@ -100,11 +100,11 @@ def load_configuration() -> NACEConfig:
             setattr(cfg_module, key, getattr(valid_config, key))
     
     # return module instead of the config itself, so that the script's variables can be modified from other scripts...
-    # it is treated as if its type is NACEConfig
+    # it is treated as if its type is NCA_WM_Config
     return cfg_module # type: ignore
 
 # print info about inputs, parameters and such
-def print_model_info(model: NACE, details: bool = False):
+def print_model_info(model: NCA_WM, details: bool = False):
     inputs_details = ""
     if details:
         # what input_dim is made out of

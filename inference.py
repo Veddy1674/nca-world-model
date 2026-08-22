@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 from base_config import * # intellisense for configs
 
@@ -11,7 +11,7 @@ from base_config import * # intellisense for configs
 # which would recompile everytime action is a different integer
 @eqx.filter_jit
 def _model_inference(
-        model: NACE,
+        model: NCA_WM,
         grid_h: int,
         grid_w: int,
         curr_state: jax.Array,
@@ -99,7 +99,7 @@ def _model_inference(
 
 # 1 step warmup for JAX to compile function and return an inference function
 # with less parameters (for better readability, _model_inference could be used alone)
-def compile_model_inference(model: NACE, grid_h: int, grid_w: int, curr_state: jax.Array, substeps: int, key: Any) -> tuple[Callable, Any]:
+def compile_model_inference(model: NCA_WM, grid_h: int, grid_w: int, curr_state: jax.Array, substeps: int, key: Any) -> tuple[Callable, Any]:
     curr_state, _, key = _model_inference(
         model,
         grid_h,

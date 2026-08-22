@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 import optax
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 4000
@@ -38,7 +38,7 @@ COLOR_MAP = [
 _class_weights = jnp.array([63.0, 1.0])
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),

@@ -3,7 +3,7 @@ import numpy as np
 import optuna
 from time import perf_counter
 
-from NACE import NACE
+from NCA_WM import NCA_WM
 import train
 
 from base_config import * # intellisense for configs
@@ -67,7 +67,7 @@ def main():
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     # optuna study to minimize loss
-    study = optuna.create_study(direction="minimize", study_name="NACE_Sweep")
+    study = optuna.create_study(direction="minimize", study_name="NCA_WM_Sweep")
     
     print("Initiating hyperparameter sweep...\n")
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     train.PRINT_ENABLED = False # disable tqdm and logging prints
 
     # dummy model required to load data
-    model: NACE = cfg.make_model(jax.random.key(0)) # overwritten in objective() each trial
+    model: NCA_WM = cfg.make_model(jax.random.key(0)) # overwritten in objective() each trial
 
     # print using device name
     print(f"Using {jax.devices()[0].device_kind.upper()}")

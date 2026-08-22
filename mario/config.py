@@ -4,7 +4,7 @@ import optax
 import optuna
 import numpy as np
 import cv2
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 500
@@ -51,7 +51,7 @@ _class_weights = jnp.ones(len(COLOR_MAP))
 _class_weights = _class_weights.at[([16, 33],)].set([0.8, 0.4])
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),
@@ -85,8 +85,8 @@ def loss_calc(vis_preds: jnp.ndarray, hid_preds: jnp.ndarray, targets: jnp.ndarr
 
     return celoss
 
-# def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NACE, optax.GradientTransformation]:
-#     return NACE(
+# def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NCA_WM, optax.GradientTransformation]:
+#     return NCA_WM(
 #         # neural network
 #         actions=len(KEY_MAP),
 #         vis_channels=len(COLOR_MAP),
@@ -100,7 +100,7 @@ def loss_calc(vis_preds: jnp.ndarray, hid_preds: jnp.ndarray, targets: jnp.ndarr
 #     ), make_optimizer()[0]
 
 # custom inference logic:
-def state_convert(model: NACE, state: jax.Array, hid: jax.Array):
+def state_convert(model: NCA_WM, state: jax.Array, hid: jax.Array):
     # get visible channels from state and move to RAM
     visible = np.array(jnp.argmax(state, axis=0), dtype=np.uint8)
 

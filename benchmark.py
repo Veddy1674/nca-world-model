@@ -3,14 +3,14 @@ import jax.numpy as jnp
 import numpy as np
 from time import perf_counter
 
-from NACE import NACE
+from NCA_WM import NCA_WM
 from inference import compile_model_inference
 
 from base_config import * # intellisense for configs
 
 # runs a benchmark for 'total_time' seconds, grid is HW
 # python for loops are used for a realistic inference benchmark
-def run_benchmark(model: NACE, grid_w: int, grid_h: int, total_time: float = 5.0, *, key: jax.Array):
+def run_benchmark(model: NCA_WM, grid_w: int, grid_h: int, total_time: float = 5.0, *, key: jax.Array):
 
     print(f"Benchmarking with grid {grid_w}x{grid_h} ({grid_w * grid_h:,} cells):")
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     cfg = load_configuration()
 
     # init model (no load needed to benchmark)
-    model: NACE = cfg.make_model(jax.random.key(0))
+    model: NCA_WM = cfg.make_model(jax.random.key(0))
 
     # print using device name
     print(f"Using {jax.devices()[0].device_kind.upper()}")

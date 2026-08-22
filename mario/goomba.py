@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 import numpy as np
 import cv2
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 10000
@@ -42,7 +42,7 @@ COLOR_MAP = [
 _class_weights = jnp.array([0.8, 0.8, 1.0])
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),
@@ -120,7 +120,7 @@ def loss_calc(preds: jnp.ndarray, targets: jnp.ndarray, actions: jnp.ndarray, in
     return celoss + hidden_loss
 
 # custom inference logic:
-# def state_convert(model: NACE, state: jax.Array):
+# def state_convert(model: NCA_WM, state: jax.Array):
 #     # get visible channels from state and move to RAM
 #     if state.ndim == 3: # if CHW (one-hot)
 #         visible = np.array(jnp.argmax(state[:model.vis_channels], axis=0), dtype=np.uint8)

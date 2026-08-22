@@ -2,7 +2,7 @@
 *
 
 # whitelist of known files
-!NACE.py
+!NCA_WM.py
 !train.py
 !inference.py
 !inference_cv2.py

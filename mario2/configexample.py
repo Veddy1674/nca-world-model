@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import optax
 import optuna
-from NACE import NACE
+from NCA_WM import NCA_WM
 
 # training
 STEPS = 4000
@@ -44,7 +44,7 @@ COLOR_MAP = [
 _class_weights = jnp.array([63.0, 1.0])
 
 def make_model(key):
-    return NACE(
+    return NCA_WM(
         # neural network
         actions=len(KEY_MAP),
         vis_channels=len(COLOR_MAP),
@@ -79,7 +79,7 @@ def make_optimizer() -> tuple[optax.GradientTransformation, optax.Schedule | Non
 #         info_expanded = info[:, :, None, None].astype(jnp.bfloat16)
 #         return jnp.where(mask == 1, info_expanded, hid)
 
-# def add_noise(model: NACE, vis: jnp.ndarray, hid: jnp.ndarray, key) -> tuple[jnp.ndarray, jnp.ndarray]:
+# def add_noise(model: NCA_WM, vis: jnp.ndarray, hid: jnp.ndarray, key) -> tuple[jnp.ndarray, jnp.ndarray]:
 #     vis += jax.random.normal(key, vis.shape, dtype=model.dtype) * 0.05
 #     hid *= 0.9
 #     return vis, hid
@@ -128,7 +128,7 @@ def loss_calc(vis_preds: jnp.ndarray, hid_preds: jnp.ndarray, targets: jnp.ndarr
 
 # MSE_LOSS_WEIGHT = 5.0
 
-# def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NACE, optax.GradientTransformation]:
+# def hyperparam_sweep(key: jax.Array, trial: optuna.Trial) -> tuple[NCA_WM, optax.GradientTransformation]:
 #     global MSE_LOSS_WEIGHT
 
 #     MSE_LOSS_WEIGHT = trial.suggest_float("MSE_LOSS_WEIGHT", 0.5, 10.0)
