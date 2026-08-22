@@ -13,21 +13,6 @@
 !requirements.txt
 !.gitignore
 
-# whitelist folders TODO only include example etc, exclude .npz etc...
+# TODO reduce .npz of example!
 !example/
 !example/**/*
-!mario/
-!mario/**/*
-!mario2/
-!mario2/**/*
-!mario3/
-!mario3/**/*
-!finish/
-!finish/**/*
-!snake/
-!snake/**/*
-!sm64test/
-!sm64test/**/*
-
-# TODO (temp) just to exclude the many contents
-sm64test/data/
