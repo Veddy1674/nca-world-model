@@ -16,3 +16,4 @@
 # TODO reduce .npz of example!
 !example/
 !example/**/*
+example/__pycache__/
