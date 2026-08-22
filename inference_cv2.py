@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import numpy as np
 import cv2
 
-from NCA_WM import NCA_WM, load_model
+from NCWM import NCWM, load_model
 from inference import compile_model_inference
 from dataload import load_first
 
@@ -50,7 +50,7 @@ def reset_hidden():
     else:
         return None
 
-def main(model: NCA_WM):
+def main(model: NCWM):
     # to silence pyright
     assert cfg.FPS is not None
     
@@ -205,7 +205,7 @@ if __name__ == "__main__":
     cfg = load_configuration()
 
     # init model and optimizer
-    model: NCA_WM = cfg.make_model(jax.random.key(0))
+    model: NCWM = cfg.make_model(jax.random.key(0))
 
     # print using device name
     print(f"Using {jax.devices()[0].device_kind.upper()}")
@@ -231,7 +231,7 @@ if __name__ == "__main__":
         print("Note: COLOR_MAP is defined but vis_channels are continuous (RGB), it is being ignored")
 
     # setup renderer
-    WIN_NAME = "NCA_WM - Inference with opencv-python"
+    WIN_NAME = "NCWM - Inference with opencv-python"
     cv2.namedWindow(WIN_NAME)
 
     CV2_KEY_MAP = {ord(k): v for k, v in cfg.KEY_MAP.items()} # ord(key string)s

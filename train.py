@@ -6,7 +6,7 @@ from glob import glob
 from tqdm import tqdm
 from time import perf_counter
 
-from NCA_WM import NCA_WM, save_model_and_optstate, load_model_and_optstate
+from NCWM import NCWM, save_model_and_optstate, load_model_and_optstate
 from dataload import preprocess_npz
 
 from base_config import * # intellisense for configs
@@ -15,7 +15,7 @@ from base_config import * # intellisense for configs
 # in functions called often for performance reasons
 
 # training-related functions:
-def load_and_flatten_data(cfg: NCA_WM_Config, model: NCA_WM):
+def load_and_flatten_data(cfg: NCWM_Config, model: NCWM):
     files = sorted(glob(cfg.DATA_GLOB)) # sort is necessary for determinism (load files in the same order)
 
     if cfg.DATA_LIMIT is not None: # None = include all
@@ -130,7 +130,7 @@ def prepare_data(seq_length, filekey, chunk_size):
     return batch_idx[:, None] + offsets[None, :]
 
 # loss function with batch support
-def loss_func(model: NCA_WM, x, y, action_map, i_in, i_out, key):
+def loss_func(model: NCWM, x, y, action_map, i_in, i_out, key):
     # x is (BATCH_SIZE, seq_length, C, H, W)
     total_steps = x.shape[1]
 
@@ -238,7 +238,7 @@ def loss_and_update(diff_model, static_model, opt_state, x, y, action_map, i_in,
 
 # runs train steps 'LOG_SEGMENTS' amount of times to reduce CPU overhead
 @eqx.filter_jit
-def train_chunk(model: NCA_WM, opt_state, key, seq_length, chunk_size, load_vram, all_x, all_y, all_a, all_i_in, all_i_out):
+def train_chunk(model: NCWM, opt_state, key, seq_length, chunk_size, load_vram, all_x, all_y, all_a, all_i_in, all_i_out):
 
     # split static parts (like lambdas) out of jax loop
     diff_model, static_model = eqx.partition(model, model.trainable_mask)
@@ -427,7 +427,7 @@ if __name__ == "__main__":
     cfg = load_configuration()
 
     # init model
-    model: NCA_WM = cfg.make_model(jax.random.key(0))
+    model: NCWM = cfg.make_model(jax.random.key(0))
     # print using device name
     print(f"Using {jax.devices()[0].device_kind.upper()}")
 

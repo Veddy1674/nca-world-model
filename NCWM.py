@@ -5,7 +5,7 @@ import equinox as eqx
 import optax
 import numpy as np
 
-class NCA_WM(eqx.Module):
+class NCWM(eqx.Module):
     """
     A JAX implementation of a 'Neural Adaptive Cellular Engine', a model capable of learning emergent behaviors for game-like simulations
     
@@ -331,12 +331,12 @@ class NCA_WM(eqx.Module):
     # applies forward sequentially 'substeps' amount of times
     def step(self, state: jnp.ndarray, action_map: jnp.ndarray | None, substeps: int, key: jax.Array) -> jnp.ndarray:
         # downscale if factor > 1
-        state = NCA_WM.pixel_unshuffle(state, self.downscale_factor)
+        state = NCWM.pixel_unshuffle(state, self.downscale_factor)
     
         # downscale action map
         action = None
         if action_map is not None:
-            action = NCA_WM.pixel_unshuffle(action_map, self.downscale_factor)
+            action = NCWM.pixel_unshuffle(action_map, self.downscale_factor)
 
         # forward steps - a python for loop is being used rather than jax's fori_loop
         # or scan because "substeps" is usually a small static number, the overhead is not worth it
@@ -347,13 +347,13 @@ class NCA_WM(eqx.Module):
             state = self(state, action, step_key)
             
         # upscale back to original resolution
-        return NCA_WM.pixel_shuffle(state, self.downscale_factor)
+        return NCWM.pixel_shuffle(state, self.downscale_factor)
 
-def save_model_and_optstate(model: NCA_WM, path: str, opt_state: optax.OptState):
+def save_model_and_optstate(model: NCWM, path: str, opt_state: optax.OptState):
     trainable_model = eqx.filter(model, model.trainable_mask) # only save trainable parameters! exclude kernel
     eqx.tree_serialise_leaves(path, (trainable_model, opt_state))
 
-def load_model_and_optstate(path: str, skeleton: NCA_WM, optimizer: optax.GradientTransformation) -> tuple[NCA_WM, optax.OptState]:
+def load_model_and_optstate(path: str, skeleton: NCWM, optimizer: optax.GradientTransformation) -> tuple[NCWM, optax.OptState]:
     # skeleton must be created with the same parameters as the saved model
 
     # get model weights and opt state from skeleton
@@ -367,7 +367,7 @@ def load_model_and_optstate(path: str, skeleton: NCA_WM, optimizer: optax.Gradie
     return eqx.combine(loaded_params, skeleton), loaded_opt_state
 
 # only load model and discard opt_state
-def load_model(path: str, skeleton: NCA_WM) -> NCA_WM:
+def load_model(path: str, skeleton: NCWM) -> NCWM:
     base_params = eqx.filter(skeleton, skeleton.trainable_mask)
     
     loaded_params, _ = eqx.tree_deserialise_leaves(path, (base_params, None))
