@@ -12,6 +12,7 @@
 !sweep.py
 !requirements.txt
 !.gitignore
+!pyproject.toml
 
 # TODO reduce .npz of example!
 !example/
