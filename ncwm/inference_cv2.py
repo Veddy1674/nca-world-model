@@ -1,17 +1,17 @@
+from typing import Optional, Union
 import jax
 import jax.numpy as jnp
 import numpy as np
 import cv2
 
-from NCWM import NCWM, load_model
-from inference import compile_model_inference
-from dataload import load_first
-
-from base_config import * # intellisense for configs
+from ncwm.model import NCWM, load_model
+from ncwm.base_config import NCWM_Config, print_model_info, print_device
+from ncwm.inference import compile_model_inference
+from ncwm.dataload import load_first
 
 # convert CHW jax array to cv2 matlike to render
 # hidden channels could be used in custom implementations
-def state_convert(state: jax.Array, hid: jax.Array | None):
+def state_convert(cfg: NCWM_Config, model: NCWM, grid_h: int, grid_w: int, state: jax.Array, hid: Optional[jax.Array]) -> np.ndarray:
     if cfg.state_convert is not None:
         return cfg.state_convert(model, state, hid)
     
@@ -30,9 +30,11 @@ def state_convert(state: jax.Array, hid: jax.Array | None):
         visible = np.array(state, dtype=np.uint8)
 
     # create empty HWC BGR image
-    img = np.zeros((GRID_H, GRID_W, 3), dtype=np.uint8)
+    img = np.zeros((grid_h, grid_w, 3), dtype=np.uint8)
 
-    assert cfg.COLOR_MAP is not None, "This assert should never fail - COLOR_MAP was set to None due to is_continuous being True"
+    # this is the specific case
+    if cfg.COLOR_MAP is None:
+        raise ValueError("COLOR_MAP is None, but is_continuous is False. This is okay unless you really want to use this inference script for visualization, if so, you must define COLOR_MAP or set is_continuous to True (and use RGB data and such)")
     
     # paint each class with its color from COLOR_MAP
     for class_idx, color in enumerate(cfg.COLOR_MAP):
@@ -41,35 +43,52 @@ def state_convert(state: jax.Array, hid: jax.Array | None):
     # upscale
     return cv2.resize(img, cfg.WIN_SIZE, interpolation=cv2.INTER_NEAREST)
 
-def reset_hidden():
+def reset_hidden(cfg: NCWM_Config, model: NCWM, first_state: jax.Array, first_info: Optional[jax.Array], grid_h: int, grid_w: int):
     if cfg.init_hidden is not None:
         # pass the first state and info (if any) to initialize hidden channels
-        return cfg.init_hidden(FIRST_STATE, FIRST_INFO, model.hid_channels, GRID_H, GRID_W)
+        return cfg.init_hidden(first_state, first_info, model.hid_channels, grid_h, grid_w)
+
     elif model.hid_channels > 0:
-        return jnp.zeros((model.hid_channels, GRID_H, GRID_W), dtype=model.dtype)
+        return jnp.zeros((model.hid_channels, grid_h, grid_w), dtype=model.dtype)
+        
     else:
         return None
 
-def main(model: NCWM):
+def _full_inference(
+        cfg: NCWM_Config,
+        model: NCWM,
+        win_name: str,
+        cv2_key_map: dict[int, int],
+        first_state: jax.Array,
+        first_info: Optional[jax.Array],
+        grid_h: int,
+        grid_w: int,
+        key: jax.Array
+    ):
+
     # to silence pyright
     assert cfg.FPS is not None
     
     FPS = 1000 // cfg.FPS
 
-    curr_state = FIRST_STATE
-    curr_hid = reset_hidden()
-    curr_image = state_convert(curr_state, curr_hid)
+    # init state and hidden
+    curr_state = first_state
+    curr_hid = reset_hidden(cfg, model, first_state, first_info, grid_h, grid_w)
+    curr_image = state_convert(cfg, model, grid_h, grid_w, curr_state, curr_hid)
+
+    # warmup/compilation
+    model_inference, key = compile_model_inference(model, grid_h, grid_w, first_state, cfg.SUBSTEPS, key)
 
     while True:
         # render
-        cv2.imshow(WIN_NAME, curr_image)
+        cv2.imshow(win_name, curr_image)
 
         keyPress = cv2.waitKey(FPS) & 0xFF
 
-        action_onehot: np.ndarray | jax.Array | None = None # defined here to allow custom one-hot
+        action_onehot: Optional[Union[np.ndarray, jax.Array]] = None # defined here to allow custom one-hot
 
         try: # getWindowProperty can raise cv2.error
-            if cv2.getWindowProperty(WIN_NAME, cv2.WND_PROP_VISIBLE) < 1 or keyPress == 27: # if closing window or ESC (exit)
+            if cv2.getWindowProperty(win_name, cv2.WND_PROP_VISIBLE) < 1 or keyPress == 27: # if closing window or ESC (exit)
                 break
         except cv2.error:
             break
@@ -99,16 +118,16 @@ def main(model: NCWM):
             mean_hid = np.array(jnp.mean(curr_hid, axis=0)) # (GRID_H, GRID_W)
 
             # size of each cell when upscaled
-            cell_h = cfg.WIN_SIZE[1] // GRID_H # type: ignore
-            cell_w = cfg.WIN_SIZE[0] // GRID_W # type: ignore
+            cell_h = cfg.WIN_SIZE[1] // grid_h # type: ignore
+            cell_w = cfg.WIN_SIZE[0] // grid_w # type: ignore
 
             # constants to draw text (and calc text size)
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 1.0
             thickness = 1
 
-            for y in range(GRID_H):
-                for x in range(GRID_W):
+            for y in range(grid_h):
+                for x in range(grid_w):
                     mean = float(mean_hid[y, x]) # mean of hidden channels for this cell
                     text = f"{mean:.1f}"
                     
@@ -163,16 +182,16 @@ def main(model: NCWM):
                 print("Error: Invalid format. Only numbers and spaces allowed.")
 
         elif keyPress == ord('r'): # R (reset)
-            curr_state = FIRST_STATE
-            curr_hid = reset_hidden()
-            curr_image = state_convert(curr_state, curr_hid)
+            curr_state = first_state
+            curr_hid = reset_hidden(cfg, model, first_state, first_info, grid_h, grid_w)
+            curr_image = state_convert(cfg, model, grid_h, grid_w, curr_state, curr_hid)
             continue
 
         # if no actions, any key triggers the prediction
         if action_onehot is None and model.actions > 0: # default index to onehot logic
         
             # check if pressed key is mapped to an action or set to invalid
-            action_idx: int = CV2_KEY_MAP.get(keyPress, -1)
+            action_idx: int = cv2_key_map.get(keyPress, -1)
 
             if action_idx == -1:
                 # action was invalid and FPS is blocking, ignore (found a key not in key map)
@@ -192,23 +211,19 @@ def main(model: NCWM):
             action_onehot = jnp.array(action_onehot, dtype=model.dtype)
 
         # forward state and return next state (autoregressive)
-        global key
         curr_state, curr_hid, key = model_inference(curr_state, curr_hid, action_onehot, 0.0, key)
 
         # update image
-        curr_image = state_convert(curr_state, curr_hid)
+        curr_image = state_convert(cfg, model, grid_h, grid_w, curr_state, curr_hid)
     
     cv2.destroyAllWindows()
 
-if __name__ == "__main__":
-    # allow config loading as first argument
-    cfg = load_configuration()
-
+def main(cfg: NCWM_Config):
     # init model and optimizer
     model: NCWM = cfg.make_model(jax.random.key(0))
 
-    # print using device name
-    print(f"Using {jax.devices()[0].device_kind.upper()}")
+    # print name of device in use
+    print_device()
 
     # load model, ignore optimizer and opt_state
     model = load_model(cfg.LOAD_MODEL_INF, model)
@@ -242,8 +257,6 @@ if __name__ == "__main__":
     key = jax.random.key(1)
     np.random.seed(1)
 
-    model_inference, key = compile_model_inference(model, GRID_H, GRID_W, FIRST_STATE, cfg.SUBSTEPS, key)
-
     # adjust win size if none
     if cfg.WIN_SIZE is None:
         # base 832x832 - because 832 is easily divided by 2 and powers of 2
@@ -262,6 +275,6 @@ if __name__ == "__main__":
     print(f"Window initialized - {cfg.WIN_SIZE[0]}x{cfg.WIN_SIZE[1]}")
     
     try:
-        main(model)
+        _full_inference(cfg, model, WIN_NAME, CV2_KEY_MAP, FIRST_STATE, FIRST_INFO, GRID_H, GRID_W, key)
     except KeyboardInterrupt:
         pass

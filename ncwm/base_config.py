@@ -1,0 +1,146 @@
+import jax
+import jax.numpy as jnp
+import equinox as eqx
+import optax
+import optuna
+from pydantic import BaseModel, Field
+from typing import Any, Optional, Callable, Union, Literal
+from cv2.typing import MatLike
+from ncwm.model import NCWM
+import importlib.util
+import types
+import os
+import sys
+
+# all the constants and functions required in a configuration
+class NCWM_Config(BaseModel):
+    # training parameters
+    STEPS: int = Field(gt=0)
+    BATCH_SIZE: int = Field(gt=0)
+    LOG_SEGMENTS: int = Field(ge=-1) # how many logging prints in the entire training 0 or -1 to disable logging
+    LOAD_MODEL: Optional[str] # path to load the model and optimizer state at the beginning (None to train from scratch)
+    SAVE_MODEL: Optional[str] # path to save the model and optimizer state (None to skip saving)
+    LOSS_GRAPH: Optional[str] # path to save a matplotlib loss graph at the end
+    TRUNCATED_BPTT: int = Field(gt=0) # how long hidden channels persist for before reset (zeroed or noise applied), makes batched training sequential
+
+    # data loading parameters (training only)
+    DATA_GLOB: str # glob path to load .npz data files
+    DATA_LIMIT: Union[int, Optional[tuple[Optional[int], Optional[int]]]] # limit data to include, where None is "all", e.g: (None, 200) includes the first 200 files (both ends inclusive)
+    LOADING_MODE: Literal["RAM", "VRAM", "DISK"] # VRAM = all data to GPU right away, RAM = all data in RAM, given to GPU each train chunk/step, DISK = load data to RAM and GPU progressively
+
+    # inference parameters
+    LOAD_MODEL_INF: str # path to load the model for inference
+    LOAD_DATA_INF: str # path to load the first state for inference (.npz data file or .png to start from, if glob matches multiple files, the first one is used)
+    DATA_IDX_INF: int # index of the data file (LOAD_DATA_INF) to load for inference
+    WIN_SIZE: Optional[tuple[int, int]] # width, height - window size for inference, if None it is auto-calculated from the data shape
+    KEY_MAP: dict[str, int] # key mapping for inference (length should be equal to model actions)
+    # ^^^ TODO don't allow 'R' or other special keys
+    DEFAULT_ACTION: Optional[int] # action to take when no key is pressed, if None wait for input (must be defined if FPS is valid)
+    FPS: Optional[int] # if 0 or None wait for input, otherwise wait for 1000 // FPS milliseconds and step with DEFAULT_ACTION
+
+    # model/shared parameters
+    SUBSTEPS: int = Field(gt=0) # how many forwards for each step, preferably even
+    COLOR_MAP: Optional[list[tuple[int, int, int]]] # list of RGB colors the data states have (length should be equal to model visual channels), or None if RGB
+    
+    make_model: Callable
+    make_optimizer: Callable[[], tuple[optax.GradientTransformation, optax.Schedule]]
+    init_hidden: Optional[Callable[[jax.Array, Optional[jax.Array], int, int, int], jax.Array]] = None # initialize hidden channels each train sequence to certain values (by default zeroed)
+    loss_calc: Callable[[jax.Array, Optional[jax.Array], jax.Array, Optional[jax.Array], Optional[jax.Array]], jax.Array]
+    add_noise: Optional[Callable[[NCWM, jax.Array, Optional[jax.Array], jax.Array], tuple[jax.Array, jax.Array]]] = None
+
+    hyperparam_sweep: Optional[Callable[[jax.Array, optuna.Trial], tuple[NCWM, optax.GradientTransformation]]] = None
+
+    state_convert: Optional[Callable[[NCWM, jax.Array, Optional[jax.Array]], MatLike]] = None # optional function to convert model prediction to cv2 render format with a custom logic
+
+    model_config = {"arbitrary_types_allowed": True}
+
+# called from scripts that require a configuration file
+def load_configuration(config_dict: Optional[dict[str, Any]] = None) -> NCWM_Config:
+    # config_dict can be "globals()" passed from a .ipynb notebook
+    if config_dict is not None:
+        # ignore __name__, __file__ etc.
+        config_vars = {
+            k: v for k, v in config_dict.items() if not k.startswith('__')
+        }
+
+        # create a fake module
+        cfg_module = types.ModuleType("dict_config")
+
+        config_path = None # (to silence pyright)
+    
+    else:
+    
+        # arg0 is configPath, if null ask via input()
+        if len(sys.argv) < 2:
+            try:
+                config_path = input("Config Path: ")
+            except (KeyboardInterrupt, EOFError):
+                print("\nExiting...")
+                sys.exit(1)
+        else:
+            config_path = sys.argv[1]
+
+        # (just in case)
+        config_path = os.path.abspath(config_path)
+        
+        # config exists check
+        if not os.path.exists(config_path):
+            print(f"File not found: {config_path}")
+            sys.exit(1)
+        
+        # load module and execute
+        spec = importlib.util.spec_from_file_location(os.path.basename(config_path), config_path)
+        if spec is None or spec.loader is None:
+            print(f"Invalid module: {config_path}")
+            sys.exit(1)
+        
+        cfg_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cfg_module)
+        
+        # ignore __name__, __file__ etc.
+        config_vars = {
+            k: v for k, v in vars(cfg_module).items() if not k.startswith('__')
+        }
+    
+    # end of branch
+    
+    try:
+        # just to validate, unused
+        valid_config = NCWM_Config(**config_vars)
+    except Exception as e:
+        print(f"Validation of config {config_path or "(in current scope)"} failed: {str(e)}")
+        sys.exit(1)
+
+    # define non-defined optional attributes or functions (e.g: if add_noise wasn't defined it becomes add_noise = None)
+    for key, value in valid_config.model_dump(exclude_none=False).items():
+        if not hasattr(cfg_module, key):
+            setattr(cfg_module, key, value)
+    
+    for key in valid_config.__dict__:
+        if not hasattr(cfg_module, key):
+            setattr(cfg_module, key, getattr(valid_config, key))
+    
+    # return module instead of the config itself, so that the script's variables can be modified from other scripts...
+    # it is treated as if its type is NCWM_Config
+    return cfg_module # type: ignore
+
+# print info about inputs, parameters and such
+def print_model_info(model: NCWM, details: bool = False):
+    inputs_details = ""
+    if details:
+        # what input_dim is made out of
+        vis = model.vis_channels
+        hid = model.hid_channels
+        acts = model.actions
+        krnl = model.kernel_size
+        inputs_details = f" (krnl: {krnl} x (vis: {vis} + hid: {hid}) + acts: {acts})"
+
+    print(f"Model inputs: {model.input_dim}{inputs_details}")
+    
+    params = sum(x.size for x in jax.tree_util.tree_leaves(eqx.filter(model, model.trainable_mask)))
+    print(f"Model parameters: {params:,}")
+
+# print current device used by JAX
+def print_device():
+    # creates a dummy array on the current device to find out the device type
+    print(f"Using {jax.jit(lambda x: x)(jnp.zeros(1)).devices().pop().device_kind.upper()}")

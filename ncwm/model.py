@@ -7,7 +7,7 @@ import numpy as np
 
 class NCWM(eqx.Module):
     """
-    A JAX implementation of a 'Neural Adaptive Cellular Engine', a model capable of learning emergent behaviors for game-like simulations
+    A JAX implementation of a 'Neural Cellular (Automata) World Model', a model capable of learning emergent behaviors for game-like simulations
     
     Args:
         `actions`: Number of action channels that each cell perceives
@@ -28,7 +28,7 @@ class NCWM(eqx.Module):
     hid_channels: int = eqx.field(static=True)
     padding_mode: str | float = eqx.field(static=True)
     downscale_factor: int = eqx.field(static=True)
-    embedding_dim: int | None = eqx.field(static=True)
+    embedding_dim: Optional[int] = eqx.field(static=True)
     global_context: bool = eqx.field(static=True)
     dtype: jnp.dtype = eqx.field(static=True)
 
@@ -41,8 +41,8 @@ class NCWM(eqx.Module):
     kernel: jnp.ndarray # not static, but excluded as a training parameter
     
     net: eqx.nn.Sequential
-    vis_embedding_encoder: eqx.nn.Embedding | None
-    vis_embedding_decoder: eqx.nn.Conv2d | None
+    vis_embedding_encoder: Optional[eqx.nn.Embedding]
+    vis_embedding_decoder: Optional[eqx.nn.Conv2d]
     
     def __init__(self,
             actions: int,
@@ -315,7 +315,7 @@ class NCWM(eqx.Module):
         return vis
 
     # forward, updates cells once
-    def __call__(self, state: jnp.ndarray, action_map: jnp.ndarray | None, key: jax.Array) -> jnp.ndarray:
+    def __call__(self, state: jnp.ndarray, action_map: Optional[jnp.ndarray], key: jax.Array) -> jnp.ndarray:
         # apply perception layer and padding
         inp = self.perceive(state, key)
         
@@ -329,7 +329,7 @@ class NCWM(eqx.Module):
         return state + dx
 
     # applies forward sequentially 'substeps' amount of times
-    def step(self, state: jnp.ndarray, action_map: jnp.ndarray | None, substeps: int, key: jax.Array) -> jnp.ndarray:
+    def step(self, state: jnp.ndarray, action_map: Optional[jnp.ndarray], substeps: int, key: jax.Array) -> jnp.ndarray:
         # downscale if factor > 1
         state = NCWM.pixel_unshuffle(state, self.downscale_factor)
     

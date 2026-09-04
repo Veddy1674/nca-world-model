@@ -6,21 +6,29 @@ from glob import glob
 from PIL import Image
 
 # default behavior of data preprocessing (convert to one-hot or keep index map if embedding)
-def preprocess_npz(
+def preprocess_data(
         file: str,
         vis_channels: int,
         use_embedding: bool,
         is_continuous: bool,
-        color_map: list[tuple[int, int, int]] | None,
+        color_map: Optional[list[tuple[int, int, int]]],
         verbose: bool = True
     ) -> tuple[np.ndarray, Optional[np.ndarray], Optional[np.ndarray]]:
 
+    raw_states = None
+    raw_actions = None
+    raw_infos = None
+
     data = np.load(file) # load to RAM
 
-    # the whole loading process uses numpy (CPU), whether data is moved in VRAM right away or later on is decided externally
-    raw_states = np.array(data['states']) # BCHW - C must be 1 if index map
-    raw_actions = np.array(data['actions']) if 'actions' in data else None # B - where B is raw_states's B - 1 (since last state has no action)
-    raw_infos = np.array(data['infos']) if 'infos' in data else None # extra info if any (e.g: about the state for hidden channels loss calc)
+    if file.endswith(".npy"):
+        # simple s = s' model: only states, no actions/infos
+        raw_states = data
+    else:
+        # the whole loading process uses numpy (CPU), whether data is moved in VRAM right away or later on is decided externally
+        raw_states = np.array(data['states']) # BCHW - C must be 1 if index map
+        raw_actions = np.array(data['actions']) if 'actions' in data else None # B - where B is raw_states's B - 1 (since last state has no action)
+        raw_infos = np.array(data['infos']) if 'infos' in data else None # extra info if any (e.g: about the state for hidden channels loss calc)
 
     # if states are integers (one-hot or index map)
     is_int = np.issubdtype(raw_states.dtype, np.integer)
@@ -63,7 +71,7 @@ def preprocess_npz(
     if use_embedding:
         if not is_int:
             if verbose:
-                print("Warning: embedding is enabled but data is one-hot. It is reccomended to have data as index map or to disable embedding")
+                print("Warning: embedding is enabled but data is one-hot. It is recommended to have data as index map or to disable embedding")
             
             raw_states = np.argmax(raw_states, axis=1).astype(np.uint8) # one-hot to index map (using uint8 in case of more than 255 classes)
         
@@ -92,14 +100,17 @@ def preprocess_image(file: str, color_map: list[tuple[int, int, int]] | None, us
     rgb = img_array[..., :3] # HW3
     alpha = img_array[..., 3]
 
-    if color_map is None: exit() # TODO RGB
+    if color_map is None:
+        # TODO implement, this method should have model as arg0 maybe
+        raise NotImplementedError("Not implemented: COLOR_MAP is None, intent is expected to be to load a RGB image for inference purposes (will be implemented), if not, whenever COLOR_MAP is None but model's 'vis_channels' isn't \"RGB\", inference is simply not possible, so make sure to either set COLOR_MAP appropriately or use a model with RGB output")
 
     rgb[alpha < 255] = [0, 0, 0] # set every transparent pixel to black
     
     # create an index map of -1s
     state_idx = np.full((h, w), -1, dtype=np.uint8)
 
-    # TODO please revise this code
+    # TODO revise (might not be performant)
+    
     for cls_idx, color in enumerate(color_map):
         # find where the pixel matches the colormap color
         mask = np.all(rgb == color, axis=-1)
@@ -127,7 +138,7 @@ def preprocess_image(file: str, color_map: list[tuple[int, int, int]] | None, us
     # transpose from HWC to CHW and convert to float32
     return jnp.transpose(one_hot, (2, 0, 1)).astype(jnp.float32)
 
-# get first state from a .npz or .png file
+# get first state from a .npz, .npy, or .png file
 def load_first(
         data_path: str,
         vis_channels: int,
@@ -140,10 +151,10 @@ def load_first(
     # if it's a glob with multiple files, take the first one
     file = sorted(glob(data_path))[0]
 
-    # data_path can be either a .npz file or a .png file
-    if file.endswith(".npz"):
+    # data_path can be either a .npz file, .npy file, or a .png file
+    if file.endswith(".npz") or file.endswith(".npy"):
 
-        s, a, i = preprocess_npz(
+        s, a, i = preprocess_data(
             file=file,
             vis_channels=vis_channels,
             use_embedding=use_embedding,
@@ -152,15 +163,15 @@ def load_first(
         )
 
         return (
-            jnp.array(s[index]), 
-            jnp.array(a[index]) if a is not None else None, 
+            jnp.array(s[index]),
+            jnp.array(a[index]) if a is not None else None,
             jnp.array(i[index]) if i is not None else None
         ) # all to VRAM
-        
+
     elif file.endswith(".png"): # TODO allow other formats (preferably lossless only)
-        
+
         # instantly to VRAM
         return preprocess_image(file, color_map, use_embedding), None, None # handles color_map None internally
 
     else:
-        raise Exception("todo")
+        raise NotImplementedError(f"Unsupported file format: {file}. Only .npz, .npy, and .png (partially) are supported")

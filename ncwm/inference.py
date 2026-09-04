@@ -1,11 +1,9 @@
-from typing import Optional
+from typing import Optional, Callable, Any
 import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from NCWM import NCWM
-
-from base_config import * # intellisense for configs
+from ncwm.model import NCWM
 
 # action is jax.Array because primitives are statically compiled,
 # which would recompile everytime action is a different integer
@@ -99,7 +97,15 @@ def _model_inference(
 
 # 1 step warmup for JAX to compile function and return an inference function
 # with less parameters (for better readability, _model_inference could be used alone)
-def compile_model_inference(model: NCWM, grid_h: int, grid_w: int, curr_state: jax.Array, substeps: int, key: Any) -> tuple[Callable, Any]:
+def compile_model_inference(
+        model: NCWM,
+        grid_h: int,
+        grid_w: int,
+        curr_state: jax.Array,
+        substeps: int,
+        key: Any
+    ) -> tuple[Callable[[jax.Array, Optional[jax.Array], Optional[jax.Array], float, jax.Array], tuple[jax.Array, Optional[jax.Array], Any]], Any]:
+
     curr_state, _, key = _model_inference(
         model,
         grid_h,
@@ -114,7 +120,7 @@ def compile_model_inference(model: NCWM, grid_h: int, grid_w: int, curr_state: j
     )
 
     # shorthand function with less parameters
-    def model_inference(curr_state: jax.Array, curr_hid: jax.Array | None, action_onehot: jax.Array | None, temperature: float, key: Any):
+    def model_inference(curr_state: jax.Array, curr_hid: Optional[jax.Array], action_onehot: Optional[jax.Array], temperature: float, key: jax.Array):
         return _model_inference(model, grid_h, grid_w, curr_state, curr_hid, action_onehot, substeps, temperature, key)
     
     return model_inference, key

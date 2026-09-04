@@ -1,20 +1,20 @@
 # exclude everything
 *
 
-# whitelist of known files
-!NCWM.py
-!train.py
-!inference.py
-!inference_cv2.py
-!dataload.py
-!benchmark.py
-!base_config.py
-!sweep.py
+# whitelist:
+!src/
+!src/**
+
+!ncwm/
+!ncwm/**
+
+!example/
+!example/**
+
 !requirements.txt
 !.gitignore
 !pyproject.toml
+!README.md
 
-# TODO reduce .npz of example!
-!example/
-!example/**/*
-example/__pycache__/
+# ignore every pycache folder anywhere
+**/__pycache__/

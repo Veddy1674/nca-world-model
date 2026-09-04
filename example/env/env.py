@@ -1,7 +1,7 @@
 import numpy as np
 
-IDX_PLAYER = 0
-IDX_BACKGROUND = 1
+IDX_BACKGROUND = 0
+IDX_PLAYER = 1
 
 class ExampleEnv():
     def __init__(self):
@@ -45,41 +45,3 @@ class ExampleEnv():
             self._move_player((y, x + 1))
 
         return self.state
-
-if __name__ == '__main__':
-    from tqdm import tqdm
-
-    env = ExampleEnv()
-
-    EPISODES = 10
-    STEPS = 400
-    OUT = "example/data/example_{:04d}.npz"
-
-    def make_episode(steps: int):
-        states = np.empty((steps, 8, 8), dtype=np.uint8) # BHW
-        actions = np.empty((steps-1), dtype=np.uint8) # B
-
-        state = env.reset()
-
-        for i in range(steps-1):
-            action = np.random.randint(0, 4)
-
-            states[i] = state
-            actions[i] = action
-
-            state = env.step(action)
-        
-        states[-1] = state
-
-        return states, actions
-    
-    for i in tqdm(range(EPISODES), "Making episodes"):
-        states, actions = make_episode(STEPS)
-
-        # save
-        np.savez_compressed(OUT.format(i), states=states, actions=actions)
-
-        # if first iteration, print shape
-        if i == 0:
-            print(f"States shape: {states.shape}")
-            print(f"Actions shape: {actions.shape}")
