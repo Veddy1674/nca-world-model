@@ -16,7 +16,7 @@ class NCWM(eqx.Module):
         `hidden_neurons`: Number of hidden neurons of the update net second layer (default: 128)
         `padding_mode`: Padding mode for the perceive function: 'reflect', 'circular', 'replicate', 'random', constant (float value), or default 'zeros'
         `kernel`: Matrix that defines the neighborhood pattern for cell interactions (default: Von Neumann 3x3)
-        `downscale_factor`: Factor to step the model through a smaller grid and upscale back (1, 2, 4, ...), reduces VRAM and accuracy (default: 1)
+        `downscale_factor`: Factor to step the model through a smaller grid and upscale back (1, 2, 4, ...), reduces VRAM and accuracy, faster on bigger grids (default: 1)
         `embedding_dim`: Dimension to compress visual channels and use index map data loading instead of one-hot (default: None - no embedding)
         `global_context`: Whether to give information about the global visible state of every cell (mean) as input to every cell (default: False)
         `dtype`: Data type of the weights of the neural networks (default: jnp.float32)
